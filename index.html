@@ -220,7 +220,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
           <h1>BESS On-Going Issues Tracker</h1>
           <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
             <span style="font-size:12px;opacity:.7">SchneiTec ESS Operations Office</span>
-            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v22</span>
+            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v23</span>
             <span id="sync-ind" style="font-size:11px;display:flex;align-items:center;gap:5px">
               <span class="sync-dot live" id="sd"></span><span id="st">Connecting...</span>
             </span>
@@ -278,7 +278,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
   </div>
 
   <div class="table-wrap"><div id="tc"></div></div>
-  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v22</b></div>
+  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v23</b></div>
 </div>
 
 <!-- MODALS -->
@@ -389,6 +389,8 @@ function doFetchAttempt(){
     hideLoad();
     fetchRetries=0;
     if(d && d.success && d.issues){
+      // Don't overwrite local data if a sync is pending (edit/delete in progress)
+      if(pendingSync){render(); upSync("live"); return;}
       var valid = d.issues.length===0 || (d.issues[0].project !== undefined);
       if(valid && d.issues.length>0){
         issues=d.issues;
@@ -407,29 +409,27 @@ function doFetchAttempt(){
     clearTimeout(timer);
     retryOrFail();
   };
-  // Timeout: Apps Script cold start can take 5-10s
+  // 15s timeout — covers Google Apps Script cold start
   var timer=setTimeout(function(){
     if(done)return; done=true;
     delete window[cbName];
     retryOrFail();
-  },10000);
+  },15000);
   document.head.appendChild(s);
   s.onload=function(){setTimeout(function(){s.remove();},100);};
 }
 function retryOrFail(){
   fetchRetries++;
-  if(fetchRetries<=3){
-    console.log("Retry "+fetchRetries+"/3...");
+  if(fetchRetries<=5){
     upSync("syncing");
     setTimeout(doFetchAttempt, 2000);
   } else {
     fetchRetries=0;
     hideLoad();
-    console.error("JSONP fetch failed after 3 retries");
     upSync("offline");
     render();
-    // Auto-retry again in 15 seconds
-    setTimeout(function(){if(useAPI)fetchAll();},15000);
+    // Keep trying every 10 seconds until connected
+    setTimeout(function(){if(useAPI)fetchAll();},10000);
   }
 }
 
@@ -442,19 +442,24 @@ function forcePush(){
   }
 }
 
+// Sync lock: prevents fetchAll from overwriting local changes while syncing
+var pendingSync=false, syncLockTimer=null;
+
 function syncToSheet(){
   if(!useAPI||!API)return;
+  // Lock for 8 seconds so fetchAll doesn't overwrite during POST
+  pendingSync=true;
+  if(syncLockTimer)clearTimeout(syncLockTimer);
+  syncLockTimer=setTimeout(function(){pendingSync=false;},8000);
   upSync("syncing");
   try{
-    // Method 1: Hidden form submit (most reliable, bypasses CORS)
     const form=document.getElementById("sync-form");
     form.action=API;
     document.getElementById("sync-data").value=JSON.stringify({action:"save_all",issues:issues});
     form.submit();
-    setTimeout(()=>upSync("live"),2000);
+    setTimeout(function(){upSync("live");},2000);
   }catch(e){
     console.error("Form sync failed, trying fetch:",e);
-    // Method 2: Fetch fallback
     try{
       fetch(API,{method:"POST",body:JSON.stringify({action:"save_all",issues:issues}),mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"}});
     }catch(e2){console.error("Fetch sync also failed:",e2);}
@@ -481,8 +486,8 @@ function upSync(s){
   const d=document.getElementById("sd"),t=document.getElementById("st");
   d.className="sync-dot "+s;
   if(s==="live"){t.textContent="Live — "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});startPoll();}
-  else if(s==="syncing")t.textContent="Syncing...";
-  else t.textContent="Offline mode";
+  else if(s==="syncing")t.textContent="Connecting...";
+  else t.textContent="Reconnecting...";
 }
 
 // ---- Helpers ----
