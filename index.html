@@ -220,7 +220,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
           <h1>BESS On-Going Issues Tracker</h1>
           <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
             <span style="font-size:12px;opacity:.7">SchneiTec ESS Operations Office</span>
-            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v23</span>
+            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v25</span>
             <span id="sync-ind" style="font-size:11px;display:flex;align-items:center;gap:5px">
               <span class="sync-dot live" id="sd"></span><span id="st">Connecting...</span>
             </span>
@@ -278,7 +278,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
   </div>
 
   <div class="table-wrap"><div id="tc"></div></div>
-  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v23</b></div>
+  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v25</b></div>
 </div>
 
 <!-- MODALS -->
@@ -296,7 +296,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
 // ⬇⬇⬇  PASTE YOUR GOOGLE APPS SCRIPT URL BETWEEN THE QUOTES BELOW  ⬇⬇⬇
 // Example: const SHARED_API_URL = "https://script.google.com/macros/s/AKfycb.../exec";
 // Once set, EVERYONE who opens the link connects automatically — no setup screen.
-const SHARED_API_URL = "https://script.google.com/macros/s/AKfycbzoO_PwTDC1xbkWc6zYKTNnkk9lz255PwkfmA_fLUit_wJpvUdsc5DtgSEUImYFTEPP/exec";
+const SHARED_API_URL = "https://script.google.com/macros/s/AKfycbzu_CiOo58J1kv8ohxZu6zh-7_BHm-8RiLT5LSUGC0MCRcv5_4pjtpvwUmOuGgTWMHn/exec";
 // ⬆⬆⬆  PASTE YOUR URL ABOVE (keep the quotes)  ⬆⬆⬆
 // ============================================================
 
@@ -447,23 +447,35 @@ var pendingSync=false, syncLockTimer=null;
 
 function syncToSheet(){
   if(!useAPI||!API)return;
-  // Lock for 8 seconds so fetchAll doesn't overwrite during POST
+  // Lock for 12 seconds so fetchAll doesn't overwrite during sync
   pendingSync=true;
   if(syncLockTimer)clearTimeout(syncLockTimer);
-  syncLockTimer=setTimeout(function(){pendingSync=false;},8000);
+  syncLockTimer=setTimeout(function(){pendingSync=false;},12000);
   upSync("syncing");
+  var payload=JSON.stringify({action:"save_all",issues:issues});
+
+  // Method 1: fetch with no-cors (works in Edge, bypasses tracking prevention)
   try{
-    const form=document.getElementById("sync-form");
+    fetch(API,{method:"POST",body:payload,mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"}}).catch(function(){});
+  }catch(e){}
+
+  // Method 2: Hidden form submit as backup
+  try{
+    var form=document.getElementById("sync-form");
     form.action=API;
-    document.getElementById("sync-data").value=JSON.stringify({action:"save_all",issues:issues});
+    document.getElementById("sync-data").value=payload;
     form.submit();
-    setTimeout(function(){upSync("live");},2000);
-  }catch(e){
-    console.error("Form sync failed, trying fetch:",e);
-    try{
-      fetch(API,{method:"POST",body:JSON.stringify({action:"save_all",issues:issues}),mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"}});
-    }catch(e2){console.error("Fetch sync also failed:",e2);}
-  }
+  }catch(e){}
+
+  // Method 3: Image beacon as last resort
+  try{
+    var img=new Image();
+    img.src=API+"?beacon=1&t="+Date.now();
+  }catch(e){}
+
+  setTimeout(function(){upSync("live");},2000);
+  // After sync completes, do a fresh fetch to confirm
+  setTimeout(function(){pendingSync=false; if(useAPI)fetchAll();},10000);
 }
 
 // Save data: always local first, then sync to sheet
