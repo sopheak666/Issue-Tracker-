@@ -612,10 +612,80 @@ function cDel(id){document.getElementById("bcd").onclick=()=>{issues=issues.filt
 function clearAll(){if(!confirm("Clear ALL records? Cannot be undone."))return;issues=[];saveData();}
 
 function exportCSV(){
-  const f=gf(),hd=["No","Project","Device","Alarm Type","SR No","Occurred","Resolved","Duration","Status","Task","Assignee","Task Status","Manhours","Site Maint.","Central Maint.","Remark"];
-  const rows=f.map((i,x)=>[x+1,i.project,i.device==="Other"?(i.customDevice||"Other"):i.device,`"${(i.alarm||"").replace(/"/g,'""')}"`,i.srNo||"-",fmtD(i.occurredDate),fmtD(i.resolvedDate),dur(i.occurredDate,i.resolvedDate),i.resolvedDate?"Resolved":"On-going",`"${(i.task||"").replace(/"/g,'""')}"`,i.taskAssignee||"-",i.taskStatus||"-",i.manhours||"-",i.siteMaintenanceStatus||"-",i.officeMaintenanceStatus||"-",`"${(i.remark||"").replace(/"/g,'""')}"`]);
-  const csv=[hd.join(","),...rows.map(r=>r.join(","))].join("\n");
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`BESS_Issues_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  var f=gf();
+  if(f.length===0){alert("No records to export.");return;}
+
+  // CSV cell escaper — wraps in quotes if needed
+  function csvCell(v){
+    var s=String(v==null?"":v).replace(/\r?\n/g," ");
+    if(s.indexOf(",")>-1||s.indexOf('"')>-1||s.indexOf("\n")>-1){return '"'+s.replace(/"/g,'""')+'"';}
+    return s;
+  }
+
+  // Format date for CSV (clean readable format)
+  function csvDate(d){
+    if(!d)return "";
+    var dt=new Date(d);
+    if(isNaN(dt))return d;
+    var dd=String(dt.getDate()).padStart(2,"0");
+    var mm=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][dt.getMonth()];
+    var yy=dt.getFullYear();
+    var hh=String(dt.getHours()).padStart(2,"0");
+    var mi=String(dt.getMinutes()).padStart(2,"0");
+    return dd+" "+mm+" "+yy+" "+hh+":"+mi;
+  }
+
+  // Headers
+  var headers=["No.","Project","Device","Alarm Type / Description","SR No.","Occurred Date","Resolved Date","Duration","Open / Close","Task Description","Assignee","Task Status","Manhours","Site Maintenance","Central Maintenance","Remark"];
+
+  // Data rows
+  var rows=[];
+  for(var x=0;x<f.length;x++){
+    var i=f[x];
+    var dev=i.device==="Other"?(i.customDevice||"Other"):i.device;
+    var status=i.taskStatus==="Completed"?"Close":"Open";
+    rows.push([
+      x+1,
+      csvCell(i.project),
+      csvCell(dev),
+      csvCell(i.alarm),
+      csvCell(i.srNo||"-"),
+      csvDate(i.occurredDate),
+      csvDate(i.resolvedDate),
+      dur(i.occurredDate,i.resolvedDate)||"-",
+      status,
+      csvCell(i.task||"-"),
+      csvCell(i.taskAssignee||"-"),
+      csvCell(i.taskStatus||"-"),
+      csvCell(i.manhours||"-"),
+      csvCell(i.siteMaintenanceStatus||"N/A"),
+      csvCell(i.officeMaintenanceStatus||"N/A"),
+      csvCell(i.remark||"")
+    ].join(","));
+  }
+
+  // Summary row
+  var totalOpen=f.filter(function(i){return i.taskStatus!=="Completed";}).length;
+  var totalClose=f.filter(function(i){return i.taskStatus==="Completed";}).length;
+  rows.push("");
+  rows.push("SUMMARY");
+  rows.push("Total Records,"+f.length);
+  rows.push("Open,"+totalOpen);
+  rows.push("Close,"+totalClose);
+  rows.push("");
+  rows.push("Exported,"+csvDate(new Date().toISOString()));
+  rows.push("Source,BESS On-Going Issues Tracker — SchneiTec ESS Operations Office");
+
+  // Build CSV with UTF-8 BOM for Excel
+  var csv="\uFEFF"+headers.join(",")+"\n"+rows.join("\n");
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  var today=new Date();
+  var fn="BESS_Issues_"+today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+  a.download=fn+".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function copyScript(){const el=document.getElementById("script-code");navigator.clipboard.writeText(el.textContent.replace("📋 Copy","")).then(()=>alert("Script copied!"));}
