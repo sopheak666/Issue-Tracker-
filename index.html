@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>BESS On-Going Issues Tracker — SchneiTec ESS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23C9A84C'/><text x='16' y='22' text-anchor='middle' font-size='18' font-weight='900' fill='%231B2A4A' font-family='sans-serif'>ST</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  :root {
+    --navy: #1B2A4A; --navy-light: #2a3f6a; --steel: #3D6A9E; --gold: #C9A84C;
+    --green: #27ae60; --red: #e74c3c; --bg: #f0f2f5; --card: #fff; --border: #e2e8f0;
+    --text: #334155; --text-light: #64748b; --text-muted: #94a3b8;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans','Calibri',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* Setup */
+  .setup-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:linear-gradient(135deg,var(--navy),var(--navy-light)); }
+  .setup-box { background:#fff; border-radius:16px; max-width:640px; width:100%; padding:40px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .setup-box h1 { font-size:22px; color:var(--navy); margin-bottom:6px; }
+  .setup-box>p { font-size:14px; color:var(--text-light); margin-bottom:20px; line-height:1.5; }
+  .step { background:#f8fafc; border-radius:8px; padding:14px; margin-bottom:12px; font-size:13px; line-height:1.7; }
+  .step b { color:var(--navy); }
+  .step code { background:#e2e8f0; padding:1px 5px; border-radius:3px; font-size:12px; }
+  .sn { display:inline-block; background:var(--gold); color:var(--navy); padding:2px 8px; border-radius:4px; font-weight:800; font-size:11px; margin-right:6px; }
+  .code-block { background:#1e293b; color:#e2e8f0; border-radius:8px; padding:14px; font-family:monospace; font-size:11.5px; line-height:1.6; overflow-x:auto; margin:10px 0; white-space:pre; position:relative; }
+  .copy-btn { position:absolute; top:8px; right:8px; background:var(--gold); color:var(--navy); border:none; border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer; }
+  .url-input { width:100%; padding:12px; border:2px solid var(--border); border-radius:8px; font-size:14px; outline:none; font-family:inherit; }
+  .url-input:focus { border-color:var(--steel); }
+  .btn-go { margin-top:14px; padding:12px 28px; background:var(--gold); color:var(--navy); border:none; border-radius:8px; font-weight:800; font-size:15px; cursor:pointer; width:100%; font-family:inherit; }
+  .btn-go:hover { filter:brightness(1.08); }
+  .skip-link { display:block; text-align:center; margin-top:12px; color:var(--text-muted); font-size:12px; cursor:pointer; text-decoration:underline; }
+  .tab-btns { display:flex; gap:0; margin-bottom:18px; border-radius:8px; overflow:hidden; border:2px solid var(--border); }
+  .tab-btn { flex:1; padding:10px; text-align:center; border:none; background:#fff; font-weight:700; font-size:13px; cursor:pointer; color:var(--text-light); font-family:inherit; transition:all .15s; }
+  .tab-btn.active { background:var(--navy); color:#fff; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  .drive-icon { font-size:24px; margin-right:8px; vertical-align:middle; }
+
+  /* Header */
+  .header { background:linear-gradient(135deg,var(--navy),var(--navy-light)); color:#fff; padding:16px 24px; }
+  .header-inner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  .logo { width:40px; height:40px; background:var(--gold); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:16px; color:var(--navy); flex-shrink:0; }
+  .header h1 { font-size:19px; font-weight:700; letter-spacing:.5px; }
+  .sync-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
+  .sync-dot.live { background:#10b981; }
+  .sync-dot.syncing { background:#f59e0b; animation:pulse 1s infinite; }
+  .sync-dot.offline { background:#ef4444; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+  .btn { padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; transition:all .15s; }
+  .btn-gold { background:var(--gold); color:var(--navy); }
+  .btn-ghost { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
+  .btn-ghost-dim { background:rgba(255,255,255,.08); color:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.15); font-size:12px; }
+  .btn:hover { filter:brightness(1.1); }
+
+  .shared-notice { background:#eef6ff; border-bottom:1px solid #bfdbfe; padding:8px 24px; display:flex; align-items:center; gap:8px; font-size:12px; color:#1e40af; }
+  .drive-badge { background:#e8f5e9; color:#2e7d32; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+
+  /* Stats */
+  .stats { display:flex; gap:12px; padding:14px 24px; flex-wrap:wrap; }
+  .stat-card { background:var(--card); border-radius:8px; padding:10px 18px; box-shadow:0 1px 3px rgba(0,0,0,.08); flex:1 1 120px; min-width:120px; }
+  .stat-label { font-size:11px; color:var(--text-light); font-weight:600; text-transform:uppercase; letter-spacing:1px; }
+  .stat-value { font-size:26px; font-weight:800; }
+
+  /* Filters */
+  .filters { padding:0 24px 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .filter-group { display:flex; background:var(--card); border-radius:6px; overflow:hidden; border:1.5px solid var(--border); }
+  .filter-btn { padding:7px 16px; border:none; background:var(--card); color:#475569; font-weight:600; font-size:12px; cursor:pointer; transition:all .15s; font-family:inherit; }
+  .filter-btn.active { background:var(--navy); color:#fff; }
+  .filter-select { padding:7px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:600; color:#475569; background:var(--card); cursor:pointer; font-family:inherit; }
+  .filter-search { padding:7px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; flex:1 1 200px; min-width:140px; outline:none; font-family:inherit; }
+  .record-count { font-size:12px; color:var(--text-muted); font-weight:500; margin-left:auto; }
+
+  /* Table */
+  .table-wrap { padding:0 24px 24px; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; background:var(--card); border-radius:10px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.07); min-width:1500px; }
+  td { overflow:hidden; text-overflow:ellipsis; }
+  thead tr.mh { background:var(--navy); }
+  thead tr.sh { background:#243558; }
+  th { padding:8px 4px; color:#fff; font-size:9px; font-weight:700; text-align:center; white-space:nowrap; line-height:1.3; letter-spacing:0; text-transform:uppercase; user-select:none; }
+  th.s:hover { background:rgba(255,255,255,.1); cursor:pointer; }
+  .sh th { font-size:9px; padding:5px 4px; }
+  tbody tr { border-bottom:1px solid #f1f5f9; transition:background .1s; }
+  tbody tr:nth-child(even) { background:#f8fafc; }
+  tbody tr:hover { background:#eef6ff !important; }
+  td { padding:9px 5px; font-size:12px; border-right:1px solid #f1f5f9; }
+  .badge { padding:3px 10px; border-radius:4px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .bdot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+  .abtn { background:none; border:none; cursor:pointer; font-size:14px; padding:2px 3px; }
+  .empty { background:var(--card); border-radius:12px; padding:60px 24px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+
+  /* Modal */
+  .mo { position:fixed; inset:0; background:rgba(10,20,40,.55); z-index:1000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); opacity:0; pointer-events:none; transition:opacity .2s; }
+  .mo.on { opacity:1; pointer-events:all; }
+  .md { background:#fff; border-radius:12px; width:min(96vw,680px); max-height:90vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); transform:translateY(20px); transition:transform .2s; }
+  .mo.on .md { transform:translateY(0); }
+  .mh { padding:18px 24px; border-bottom:2px solid var(--navy); display:flex; align-items:center; justify-content:space-between; }
+  .mh h3 { font-size:17px; color:var(--navy); }
+  .mx { background:none; border:none; font-size:22px; cursor:pointer; color:#888; }
+  .mb { padding:20px 24px; }
+  .fg { display:grid; gap:14px; } .fg2 { grid-template-columns:1fr 1fr; } .fg3 { grid-template-columns:1fr 1fr 1fr; }
+  .ff label { display:block; font-size:12px; font-weight:600; color:var(--navy); margin-bottom:4px; }
+  .ff input,.ff select,.ff textarea { width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; outline:none; box-sizing:border-box; }
+  .ff input:focus,.ff select:focus,.ff textarea:focus { border-color:var(--steel); }
+  .ff textarea { resize:vertical; }
+  .fs { background:#f8fafc; border:1.5px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px; }
+  .fst { font-size:13px; font-weight:700; color:var(--navy); margin-bottom:10px; }
+  .fh { margin-top:5px; font-size:11px; color:var(--text-muted); }
+  .fa { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
+  .bc { padding:9px 20px; border:1.5px solid var(--border); border-radius:6px; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-light); font-family:inherit; }
+  .bs { padding:9px 24px; border:none; border-radius:6px; background:var(--navy); color:#fff; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; }
+  .bd { padding:8px 18px; border:none; border-radius:6px; background:var(--red); color:#fff; cursor:pointer; font-size:13px; font-weight:700; font-family:inherit; }
+  .footer { text-align:center; padding:8px 24px 20px; font-size:11px; color:var(--text-muted); }
+
+  .chart-card { background:var(--card); border-radius:12px; padding:12px 12px 8px; box-shadow:0 2px 8px rgba(27,42,74,.06); border:1px solid #eef1f6; }
+  .chart-card canvas { max-height:160px !important; }
+  .chart-title { font-size:11.5px; font-weight:700; color:var(--navy); margin-bottom:10px; text-align:center; letter-spacing:.2px; }
+
+  .loading-bar { height:3px; background:linear-gradient(90deg,var(--gold),var(--steel),var(--gold)); background-size:200%; animation:shimmer 1.5s infinite; position:fixed; top:0; left:0; right:0; z-index:2000; }
+  @keyframes shimmer { 0%{background-position:200% 0}100%{background-position:-200% 0} }
+
+  @media(max-width:768px) { .fg2,.fg3{grid-template-columns:1fr} .stats{gap:8px} .header h1{font-size:16px} #dashboard>div:nth-child(2){grid-template-columns:1fr !important} }
+  @media(min-width:769px) and (max-width:1100px){ #dashboard>div:nth-child(2){grid-template-columns:1fr 1fr !important} }
+</style>
+</head>
+<body>
+
+<!-- LOADING BAR -->
+<div class="loading-bar" id="loading" style="display:none"></div>
+
+<!-- ========== SETUP ========== -->
+<div id="setup" class="setup-screen">
+<div class="setup-box">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+    <div class="logo">ST</div>
+    <div><h1>BESS Issues Tracker</h1><p style="margin:0;font-size:13px;color:#64748b">Connect to Google Drive for free shared storage</p></div>
+  </div>
+
+  <div class="step">
+    <span class="sn">Step 1</span> Open <a href="https://sheets.new" target="_blank"><b>sheets.new</b></a> to create a new Google Sheet. Name it <code>BESS Issue Tracker</code>
+  </div>
+  <div class="step">
+    <span class="sn">Step 2</span> In the Sheet menu → <b>Extensions → Apps Script</b>. Delete any code in the editor, then paste this entire script:
+    <div class="code-block" id="script-code"><button class="copy-btn" onclick="copyScript()">📋 Copy</button>// Paste in Apps Script editor — see downloaded file
+// "backend_script.gs" for the full code
+// Or copy from below:
+
+const SHEET_NAME = "Issues";
+const COLUMNS = ["id","project","device","customDevice","alarm","srNo","occurredDate","resolvedDate","task","taskAssignee","taskStatus","manhours","siteMaintenanceStatus","officeMaintenanceStatus","remark"];
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) { sheet = ss.insertSheet(SHEET_NAME); sheet.getRange(1,1,1,COLUMNS.length).setValues([COLUMNS]).setFontWeight("bold"); sheet.setFrozenRows(1); }
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return cr({success:true,issues:[]});
+    const h=data[0], issues=[];
+    for (let i=1;i&lt;data.length;i++) { const r=data[i]; if(!r[0]&&!r[4])continue; const o={}; h.forEach((k,j)=>{o[k]=r[j]||""}); o.id=Number(o.id)||i; issues.push(o); }
+    return cr({success:true,issues});
+  } catch(err) { return cr({success:false,error:err.message}); }
+}
+
+function doPost(e) {
+  try {
+    const body=JSON.parse(e.postData.contents), action=body.action;
+    const ss=SpreadsheetApp.getActiveSpreadsheet();
+    let sheet=ss.getSheetByName(SHEET_NAME);
+    if(!sheet){sheet=ss.insertSheet(SHEET_NAME);sheet.getRange(1,1,1,COLUMNS.length).setValues([COLUMNS]).setFontWeight("bold");sheet.setFrozenRows(1);}
+    if(action==="save_all"){
+      const issues=body.issues||[], lr=sheet.getLastRow();
+      if(lr>1) sheet.getRange(2,1,lr-1,COLUMNS.length).clear();
+      if(issues.length>0){const rows=issues.map(i=>COLUMNS.map(c=>i[c]||"")); sheet.getRange(2,1,rows.length,COLUMNS.length).setValues(rows);}
+      return cr({success:true,count:issues.length});
+    } else if(action==="add"){
+      const i=body.issue; sheet.appendRow(COLUMNS.map(c=>i[c]||"")); return cr({success:true,id:i.id});
+    } else if(action==="update"){
+      const i=body.issue, data=sheet.getDataRange().getValues();
+      for(let r=1;r&lt;data.length;r++){if(Number(data[r][0])===Number(i.id)){sheet.getRange(r+1,1,1,COLUMNS.length).setValues([COLUMNS.map(c=>i[c]||"")]);return cr({success:true,id:i.id});}}
+      sheet.appendRow(COLUMNS.map(c=>i[c]||"")); return cr({success:true,id:i.id,appended:true});
+    } else if(action==="delete"){
+      const id=Number(body.id), data=sheet.getDataRange().getValues();
+      for(let r=data.length-1;r>=1;r--){if(Number(data[r][0])===id){sheet.deleteRow(r+1);return cr({success:true,deleted:id});}}
+    } else if(action==="clear_all"){
+      const lr=sheet.getLastRow(); if(lr>1)sheet.getRange(2,1,lr-1,COLUMNS.length).clear(); return cr({success:true});
+    }
+    return cr({success:false,error:"Unknown action"});
+  } catch(err) { return cr({success:false,error:err.message}); }
+}
+
+function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}</div>
+  </div>
+  <div class="step">
+    <span class="sn">Step 3</span> Click <b>Deploy → New deployment</b> → Select type: <b>"Web app"</b> → Set <b>"Execute as: Me"</b> and <b>"Who has access: Anyone"</b> → Click <b>Deploy</b> → Authorize when prompted → <b>Copy the Web App URL</b>
+  </div>
+  <div class="step">
+    <span class="sn">Step 4</span> Paste the Web App URL below and connect:
+  </div>
+
+  <input class="url-input" id="webapp-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+  <button class="btn-go" onclick="connectGoogleSheet()">📊 Connect to Google Sheet</button>
+  <span class="skip-link" onclick="startOffline()">Skip — use offline mode (this browser only)</span>
+</div>
+</div>
+
+<!-- ========== APP ========== -->
+<div id="app" style="display:none">
+  <div class="header">
+    <div class="header-inner">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="logo">ST</div>
+        <div>
+          <h1>BESS On-Going Issues Tracker</h1>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+            <span style="font-size:12px;opacity:.7">SchneiTec ESS Operations Office</span>
+            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v21</span>
+            <span id="sync-ind" style="font-size:11px;display:flex;align-items:center;gap:5px">
+              <span class="sync-dot live" id="sd"></span><span id="st">Connecting...</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="openAdd()">+ New Issue</button>
+        <button class="btn btn-ghost" onclick="toggleDash()" id="dash-btn">📊 Dashboard</button>
+        <button class="btn btn-ghost" onclick="doRefresh()">🔄 Refresh</button>
+        <button class="btn btn-ghost" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-ghost-dim" onclick="forcePush()">⬆ Fix Sheet</button>
+        <button class="btn btn-ghost-dim" onclick="clearAll()">🗑 Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="shared-notice">
+    <span style="font-size:15px">🌐</span>
+    <span><b>Shared workspace</b> — Data stored in Google Drive.</span>
+    <span class="drive-badge" id="drive-label">📊 Google Sheets Connected</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="s-t" style="color:var(--navy)">0</div></div>
+    <div class="stat-card" style="border-left:4px solid var(--red)"><div class="stat-label">Open</div><div class="stat-value" id="s-o" style="color:var(--red)">0</div></div>
+    <div class="stat-card" style="border-left:4px solid var(--green)"><div class="stat-label">Close</div><div class="stat-value" id="s-r" style="color:var(--green)">0</div></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none;padding:0 24px 24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="font-size:17px;color:var(--navy);font-weight:700">📊 Issue Summary Dashboard</h2>
+      <button class="btn" style="background:var(--border);color:var(--text);font-size:12px" onclick="toggleDash()">← Back to Table</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      <div class="chart-card"><h3 class="chart-title">Monthly Issues — Open vs Close</h3><canvas id="ch-monthly"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">Issues by Project (Open vs Close)</h3><canvas id="ch-project"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">Overall Status (Open vs Close)</h3><canvas id="ch-status"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">Issues by Device</h3><canvas id="ch-device"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">🛠 Site Maintenance Work</h3><canvas id="ch-site"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">🏢 Central Maintenance Work</h3><canvas id="ch-central"></canvas></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <button class="filter-btn active" data-f="All" onclick="setF(this)">All</button>
+      <button class="filter-btn" data-f="Open" onclick="setF(this)">Open</button>
+      <button class="filter-btn" data-f="Close" onclick="setF(this)">Close</button>
+    </div>
+    <select class="filter-select" id="pf" onchange="render()"><option value="All">All Projects</option></select>
+    <input class="filter-search" id="si" placeholder="🔍 Search issues, tasks, assignees..." oninput="render()">
+    <span class="record-count" id="rc">0 records</span>
+  </div>
+
+  <div class="table-wrap"><div id="tc"></div></div>
+  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v21</b></div>
+</div>
+
+<!-- MODALS -->
+<div class="mo" id="m-add"><div class="md"><div class="mh"><h3 id="mt">Report New Issue</h3><button class="mx" onclick="cm('m-add')">&times;</button></div><div class="mb" id="mfb"></div></div></div>
+<div class="mo" id="m-del"><div class="md"><div class="mh"><h3>Confirm Delete</h3><button class="mx" onclick="cm('m-del')">&times;</button></div><div class="mb"><p style="font-size:14px;color:#334155;margin-bottom:18px">Are you sure? This cannot be undone.</p><div class="fa"><button class="bc" onclick="cm('m-del')">Cancel</button><button class="bd" id="bcd">Delete</button></div></div></div></div>
+
+<!-- Hidden form for reliable Google Sheets sync -->
+<iframe name="sync-frame" id="sync-frame" style="display:none"></iframe>
+<form id="sync-form" method="POST" target="sync-frame" style="display:none">
+  <textarea name="data" id="sync-data"></textarea>
+</form>
+
+<script>
+// ============================================================
+// ⬇⬇⬇  PASTE YOUR GOOGLE APPS SCRIPT URL BETWEEN THE QUOTES BELOW  ⬇⬇⬇
+// Example: const SHARED_API_URL = "https://script.google.com/macros/s/AKfycb.../exec";
+// Once set, EVERYONE who opens the link connects automatically — no setup screen.
+const SHARED_API_URL = "https://script.google.com/macros/s/AKfycbzoO_PwTDC1xbkWc6zYKTNnkk9lz255PwkfmA_fLUit_wJpvUdsc5DtgSEUImYFTEPP/exec";
+// ⬆⬆⬆  PASTE YOUR URL ABOVE (keep the quotes)  ⬆⬆⬆
+// ============================================================
+
+const PROJECTS=["SNTD+DMF_12+6MWh","SNTV_12MWh","SNTL_400MWh","SNTL_600MWh","SNTB","SNTZ","MSGP","SNTK_1GWh"];
+const DEVICES=["EMS","SCADA","SPMS","BESS","PCS","BMS","HVAC","Fire System","Other"];
+const DC={EMS:"#c0392b",SCADA:"#ecf0f1",SPMS:"#27ae60",BESS:"#1abc9c",PCS:"#2980b9",BMS:"#8e44ad",HVAC:"#e67e22","Fire System":"#e74c3c",Other:"#7f8c8d"};
+const TS=["Pending","In Progress","Completed"];
+const TC={Pending:{b:"#fef3c7",t:"#92400e"},"In Progress":{b:"#dbeafe",t:"#1e40af"},Completed:{b:"#d1fae5",t:"#065f46"},Escalated:{b:"#fce7f3",t:"#9d174d"}};
+const SG=[{h:"On Going",i:["Open","Assign"]},{h:"Resolved",i:["Close"]},{h:"Other",i:["N/A"]}];
+const OG=[{h:"On Going",i:["Open","In Progress"]},{h:"Resolved",i:["Close"]},{h:"Other",i:["N/A"]}];
+const MC={Open:{b:"#fef3c7",t:"#92400e",d:"#f59e0b"},Assign:{b:"#dbeafe",t:"#1e40af",d:"#3b82f6"},"In Progress":{b:"#e0e7ff",t:"#3730a3",d:"#6366f1"},Close:{b:"#d1fae5",t:"#065f46",d:"#10b981"},"N/A":{b:"#f1f5f9",t:"#64748b",d:"#94a3b8"}};
+
+let issues=[],API="",useAPI=false,cFilter="All",sCol="occurredDate",sAsc=false,editId=null,pollTimer=null;
+
+// ---- Connect ----
+function connectGoogleSheet(){
+  const url=document.getElementById("webapp-url").value.trim();
+  if(!url||!url.includes("script.google.com")){alert("Please paste a valid Google Apps Script Web App URL.");return;}
+  API=url; useAPI=true;
+  localStorage.setItem("bess-api-url",url);
+  launch();
+}
+function startOffline(){
+  useAPI=false;
+  issues=loadLocal();
+  launch();
+  upSync("offline");
+  document.getElementById("drive-label").textContent="💾 Offline Mode";
+  document.getElementById("ml").textContent="Offline — data in this browser only";
+}
+function launch(){
+  document.getElementById("setup").style.display="none";
+  document.getElementById("app").style.display="block";
+  popProj();
+  // Always load from localStorage FIRST (instant, never empty)
+  issues=loadLocal();
+  render();
+  // Then try to sync with Google Sheets
+  if(useAPI) fetchAll();
+}
+
+// Auto-reconnect
+window.addEventListener("DOMContentLoaded",()=>{
+  // Clear corrupted data from old versions
+  const ver=localStorage.getItem("bess-version");
+  if(ver!=="v21"){
+    localStorage.clear();
+    localStorage.setItem("bess-version","v21");
+  }
+  const saved=localStorage.getItem("bess-api-url");
+  // Priority 1: hardcoded shared URL (everyone auto-connects, no setup screen)
+  if(SHARED_API_URL && SHARED_API_URL.indexOf("script.google.com")>-1){
+    API=SHARED_API_URL; useAPI=true;
+    localStorage.setItem("bess-api-url",SHARED_API_URL);
+    launch();
+  }
+  // Priority 2: previously saved URL on this browser
+  else if(saved){API=saved;useAPI=true;launch();}
+});
+
+// ---- LOCAL STORAGE (primary) ----
+const LOCAL_KEY="bess-issues-local";
+
+function saveLocal(){
+  try{ localStorage.setItem(LOCAL_KEY,JSON.stringify(issues)); }catch(e){ console.error("Local save failed:",e); }
+}
+function loadLocal(){
+  try{
+    const s=localStorage.getItem(LOCAL_KEY);
+    return s?JSON.parse(s):[];
+  }catch(e){ return []; }
+}
+
+// ---- API calls ----
+function showLoad(){document.getElementById("loading").style.display="block";}
+function hideLoad(){document.getElementById("loading").style.display="none";}
+
+async function fetchAll(){
+  showLoad(); upSync("syncing");
+  // Use JSONP to bypass CORS (loads data as script tag, no CORS needed)
+  const cbName = "__bess_cb_" + Date.now();
+  window[cbName] = function(d){
+    delete window[cbName];
+    hideLoad();
+    if(d && d.success && d.issues){
+      const valid = d.issues.length===0 || (d.issues[0].project !== undefined);
+      if(valid && d.issues.length>0){
+        issues=d.issues;
+        saveLocal();
+      } else if(d.issues.length===0 && issues.length>0){
+        syncToSheet();
+      }
+    }
+    render(); upSync("live");
+  };
+  const s=document.createElement("script");
+  s.src=API+"?callback="+cbName+"&t="+Date.now();
+  s.onerror=function(){
+    delete window[cbName];
+    hideLoad();
+    console.error("JSONP fetch failed");
+    upSync("offline");
+    render();
+  };
+  document.head.appendChild(s);
+  // Cleanup script tag after load
+  s.onload=function(){setTimeout(()=>s.remove(),100);};
+}
+
+// Force push local data to Google Sheet (fixes corrupted sheet)
+function forcePush(){
+  if(!useAPI){alert("Not connected to Google Sheets.");return;}
+  if(confirm("Push all local data to Google Sheet? This will overwrite the sheet.")){
+    syncToSheet();
+    alert("Data pushed! Click Refresh in a few seconds to verify.");
+  }
+}
+
+function syncToSheet(){
+  if(!useAPI||!API)return;
+  upSync("syncing");
+  try{
+    // Method 1: Hidden form submit (most reliable, bypasses CORS)
+    const form=document.getElementById("sync-form");
+    form.action=API;
+    document.getElementById("sync-data").value=JSON.stringify({action:"save_all",issues:issues});
+    form.submit();
+    setTimeout(()=>upSync("live"),2000);
+  }catch(e){
+    console.error("Form sync failed, trying fetch:",e);
+    // Method 2: Fetch fallback
+    try{
+      fetch(API,{method:"POST",body:JSON.stringify({action:"save_all",issues:issues}),mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"}});
+    }catch(e2){console.error("Fetch sync also failed:",e2);}
+  }
+}
+
+// Save data: always local first, then sync to sheet
+function saveData(){
+  saveLocal();
+  render();
+  if(useAPI) syncToSheet();
+}
+
+function doRefresh(){
+  if(useAPI) fetchAll();
+  else{ issues=loadLocal(); render(); }
+}
+
+// Auto-poll every 30s
+function startPoll(){if(pollTimer)clearInterval(pollTimer);if(useAPI)pollTimer=setInterval(fetchAll,30000);}
+
+// ---- Sync indicator ----
+function upSync(s){
+  const d=document.getElementById("sd"),t=document.getElementById("st");
+  d.className="sync-dot "+s;
+  if(s==="live"){t.textContent="Live — "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});startPoll();}
+  else if(s==="syncing")t.textContent="Syncing...";
+  else t.textContent="Offline mode";
+}
+
+// ---- Helpers ----
+function dur(o,r){if(!o)return"-";const d=(r?new Date(r):new Date())-new Date(o);if(d<0)return"-";const dy=Math.floor(d/864e5),h=Math.floor((d%864e5)/36e5),m=Math.floor((d%36e5)/6e4);return dy>0?dy+"d "+h+"h":h+"h "+m+"m";}
+function fmtD(dt){if(!dt)return"-";const d=new Date(dt);return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});}
+function mg(s,gs){for(const g of gs)if(g.i.includes(s))return g.h;return"";}
+function esc(s){const d=document.createElement("div");d.textContent=s||"";return d.innerHTML;}
+function devB(dv,c){const l=dv==="Other"?(c||"Other"):dv,bg=DC[dv]||"#7f8c8d",fg=dv==="SCADA"?"#1B2A4A":"#fff";return`<span class="badge" style="background:${bg};color:${fg};min-width:48px;justify-content:center">${esc(l)}</span>`;}
+function stB(r){return r?'<span class="badge" style="background:#e8f8f0;color:#27ae60">Resolved</span>':'<span class="badge" style="background:#fdecea;color:#e74c3c">On-going</span>';}
+function tkB(s){if(!s)return'<span style="color:#94a3b8;font-size:11px">-</span>';const c=TC[s]||{b:"#f1f5f9",t:"#475569"};return`<span class="badge" style="background:${c.b};color:${c.t}">${esc(s)}</span>`;}
+function mtB(s){if(!s)return'<span style="color:#94a3b8;font-size:11px">-</span>';const c=MC[s]||{b:"#f1f5f9",t:"#475569",d:"#94a3b8"};return`<span class="badge" style="background:${c.b};color:${c.t}"><span class="bdot" style="background:${c.d}"></span>${esc(s)}</span>`;}
+function popProj(){const s=document.getElementById("pf");s.innerHTML='<option value="All">All Projects</option>';PROJECTS.forEach(p=>{s.innerHTML+=`<option value="${p}">${p}</option>`;});}
+function setF(b){document.querySelectorAll(".filter-btn").forEach(x=>x.classList.remove("active"));b.classList.add("active");cFilter=b.dataset.f;render();}
+function gf(){
+  const pf=document.getElementById("pf").value,q=(document.getElementById("si").value||"").toLowerCase();
+  return issues.filter(i=>cFilter==="All"?true:cFilter==="Open"?(i.taskStatus!=="Completed"):(i.taskStatus==="Completed")).filter(i=>pf==="All"||i.project===pf).filter(i=>{if(!q)return true;return[i.alarm,i.device,i.customDevice,i.project,i.srNo,i.remark,i.task,i.taskAssignee,i.manhours,i.siteMaintenanceStatus,i.officeMaintenanceStatus].some(f=>(f||"").toLowerCase().includes(q));}).sort((a,b)=>{let va=a[sCol]||"",vb=b[sCol]||"";if(sCol==="occurredDate"||sCol==="resolvedDate"){va=va?new Date(va).getTime():0;vb=vb?new Date(vb).getTime():0;}if(va<vb)return sAsc?-1:1;if(va>vb)return sAsc?1:-1;return 0;});
+}
+function ts(c){if(sCol===c)sAsc=!sAsc;else{sCol=c;sAsc=true;}render();}
+function si(c){return sCol===c?(sAsc?" ▲":" ▼"):"";}
+
+function render(){
+  const f=gf(),tot=issues.length,on=issues.filter(i=>i.taskStatus!=="Completed").length,res=issues.filter(i=>i.taskStatus==="Completed").length;
+  document.getElementById("s-t").textContent=tot;document.getElementById("s-o").textContent=on;document.getElementById("s-r").textContent=res;
+  document.getElementById("rc").textContent=f.length+" record"+(f.length!==1?"s":"");
+  if(dashOpen)renderCharts();
+  const ct=document.getElementById("tc");
+  if(f.length===0&&issues.length===0){ct.innerHTML='<div class="empty"><div style="font-size:48px;margin-bottom:14px">📋</div><h2 style="font-size:17px;font-weight:700;color:#1B2A4A;margin-bottom:6px">No Issues Recorded Yet</h2><p style="font-size:13px;color:#94a3b8;margin-bottom:20px">Click "+ New Issue" to start logging</p><button class="btn btn-gold" onclick="openAdd()" style="font-size:14px;padding:10px 24px">+ Add First Issue</button></div>';return;}
+
+  var cols=[
+    {l:"No.",w:45},{l:"Project",w:140},{l:"Device",w:85},{l:"Alarm Type",w:200},
+    {l:"SR No.",w:90},{l:"Occurred",w:135},{l:"Resolved",w:135},{l:"Duration",w:80},
+    {l:"Task",w:140},{l:"Assignee",w:100},{l:"Task Status",w:105},
+    {l:"Manhours",w:90},{l:"Site Maint.",w:105},{l:"Central Maint.",w:110},{l:"Remark",w:150},{l:"Actions",w:115}
+  ];
+  var totalW=0; for(var w=0;w<cols.length;w++) totalW+=cols[w].w;
+
+  // ALL inline styles — no CSS class dependency
+  var h='<table style="border-collapse:collapse;table-layout:fixed;width:'+totalW+'px;background:#fff;font-family:inherit">';
+
+  // Header row — navy bg + white text inline on EACH th
+  h+='<thead><tr>';
+  for(var ci=0;ci<cols.length;ci++){
+    h+='<th style="width:'+cols[ci].w+'px;background:#1B2A4A;color:#ffffff;font-size:10px;font-weight:700;text-align:center;padding:10px 4px;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid #2a3f6a;white-space:normal;vertical-align:middle">'+cols[ci].l+'</th>';
+  }
+  h+='</tr></thead><tbody>';
+
+  if(f.length===0){
+    h+='<tr><td colspan="16" style="padding:40px;text-align:center;color:#94a3b8">No matching issues found</td></tr>';
+  } else {
+    for(var idx=0;idx<f.length;idx++){
+      var i=f[idx];
+      var p=i.project||"",dv=i.device||"",cd=i.customDevice||"",al=i.alarm||"",sr=i.srNo||"";
+      var od=i.occurredDate||"",rd=i.resolvedDate||"";
+      var tk=i.task||"",ta=i.taskAssignee||"",ts2=i.taskStatus||"";
+      var mh=i.manhours||"",sm=i.siteMaintenanceStatus||"",cm2=i.officeMaintenanceStatus||"",rm=i.remark||"";
+      var iid=i.id||0;
+      var bg=idx%2===0?"#ffffff":"#f8fafc";
+      var base='border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;padding:9px 5px;font-size:11px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;';
+
+      h+='<tr style="background:'+bg+'">';
+      h+='<td style="'+base+'width:45px;text-align:center;color:#64748b;font-weight:600">'+(idx+1)+'</td>';
+      h+='<td style="'+base+'width:140px;color:#1B2A4A;font-weight:600">'+esc(p)+'</td>';
+      h+='<td style="'+base+'width:85px;text-align:center">'+devB(dv,cd)+'</td>';
+      h+='<td style="'+base+'width:200px;color:#334155;white-space:normal" title="'+esc(al)+'">'+esc(al)+'</td>';
+      h+='<td style="'+base+'width:90px;color:#475569;font-family:monospace">'+(esc(sr)||"-")+'</td>';
+      h+='<td style="'+base+'width:135px;color:#475569;font-size:10px">'+fmtD(od)+'</td>';
+      h+='<td style="'+base+'width:135px;color:#475569;font-size:10px">'+fmtD(rd)+'</td>';
+      h+='<td style="'+base+'width:80px;color:#64748b;font-weight:600">'+dur(od,rd)+'</td>';
+      h+='<td style="'+base+'width:140px;color:#334155;white-space:normal" title="'+esc(tk)+'">'+(esc(tk)||"-")+'</td>';
+      h+='<td style="'+base+'width:100px;color:#475569;font-weight:600">'+(esc(ta)||"-")+'</td>';
+      h+='<td style="'+base+'width:105px;text-align:center">'+tkB(ts2)+'</td>';
+      h+='<td style="'+base+'width:90px;color:#1B2A4A;font-weight:700;text-align:center">'+(esc(mh)||"-")+'</td>';
+      h+='<td style="'+base+'width:105px;text-align:center">'+mtB(sm)+'</td>';
+      h+='<td style="'+base+'width:110px;text-align:center">'+mtB(cm2)+'</td>';
+      h+='<td style="'+base+'width:150px;color:#64748b;white-space:normal" title="'+esc(rm)+'">'+(esc(rm)||"-")+'</td>';
+      h+='<td style="'+base+'width:115px;text-align:center;white-space:nowrap"><button onclick="openEdit('+iid+')" style="cursor:pointer;color:#fff;background:#3D6A9E;border:none;border-radius:4px;padding:4px 9px;font-size:11px;font-weight:700;margin:1px">Edit</button> <button onclick="cDel('+iid+')" style="cursor:pointer;color:#fff;background:#e74c3c;border:none;border-radius:4px;padding:4px 9px;font-size:11px;font-weight:700;margin:1px">Del</button></td>';
+      h+='</tr>';
+    }
+  }
+  h+='</tbody></table>';
+  ct.innerHTML=h;
+}
+
+// ---- Form ----
+function bf(i){
+  const f=i||{project:PROJECTS[0],device:DEVICES[0],customDevice:"",alarm:"",srNo:"",occurredDate:"",resolvedDate:"",manhours:"",siteMaintenanceStatus:"Open",officeMaintenanceStatus:"N/A",remark:"",task:"",taskAssignee:"",taskStatus:"Pending"};
+  const dO=DEVICES.map(d=>`<option${d===f.device?" selected":""}>${d}</option>`).join(""),pO=PROJECTS.map(p=>`<option${p===f.project?" selected":""}>${p}</option>`).join(""),tO=TS.map(s=>`<option${s===f.taskStatus?" selected":""}>${s}</option>`).join("");
+  const sO=SG.map(g=>`<optgroup label="${g.h}">${g.i.map(x=>`<option${x===f.siteMaintenanceStatus?" selected":""}>${x}</option>`).join("")}</optgroup>`).join(""),oO=OG.map(g=>`<optgroup label="${g.h}">${g.i.map(x=>`<option${x===f.officeMaintenanceStatus?" selected":""}>${x}</option>`).join("")}</optgroup>`).join("");
+  return`<div class="fg fg2"><div class="ff"><label>Project</label><select id="fp">${pO}</select></div><div class="ff"><label>Device</label><select id="fd" onchange="document.getElementById('fcdw').style.display=this.value==='Other'?'block':'none'">${dO}</select><div id="fcdw" style="display:${f.device==="Other"?"block":"none"};margin-top:6px"><input id="fcd" value="${esc(f.customDevice)}" placeholder="Specify device name..."></div></div></div><div class="ff" style="margin-top:14px"><label>Alarm Type / Description</label><textarea id="fa" rows="2" placeholder="Describe the issue...">${esc(f.alarm)}</textarea></div><div class="fg fg3" style="margin-top:14px"><div class="ff"><label>SR No.</label><input id="fs" value="${esc(f.srNo)}" placeholder="e.g. 80003352"></div><div class="ff"><label>Occurred Date</label><input type="datetime-local" id="fo" value="${f.occurredDate}"></div><div class="ff"><label>Resolved Date</label><input type="datetime-local" id="fr" value="${f.resolvedDate}"></div></div><div class="fs" style="margin-top:14px"><div class="fst">📋 Task Assignment</div><div class="ff"><label>Task Description</label><textarea id="ftk" rows="2" placeholder="Action to be taken...">${esc(f.task)}</textarea></div><div class="fg fg2" style="margin-top:14px"><div class="ff"><label>Assignee</label><input id="fta" value="${esc(f.taskAssignee)}" placeholder="Person responsible"></div><div class="ff"><label>Task Status</label><select id="fts">${tO}</select></div></div></div><div class="ff" style="margin-top:14px"><label>⏱ Manhour Tracking</label><input id="fm" value="${esc(f.manhours)}" placeholder="e.g. 2 pax x 4 hrs = 8 MH"></div><div class="fg fg2" style="margin-top:14px"><div class="ff"><label>🛠 Site Maintenance</label><select id="fsm">${sO}</select><div class="fh"><span style="color:#f59e0b">●</span> On Going: Open, Assign | <span style="color:#10b981">●</span> Resolved: Close | <span style="color:#94a3b8">●</span> N/A</div></div><div class="ff"><label>🏢 Central Maintenance</label><select id="fom">${oO}</select><div class="fh"><span style="color:#f59e0b">●</span> On Going: Open, In Progress | <span style="color:#10b981">●</span> Resolved: Close | <span style="color:#94a3b8">●</span> N/A</div></div></div><div class="ff" style="margin-top:14px"><label>Remark</label><textarea id="fre" rows="2" placeholder="Additional notes...">${esc(f.remark)}</textarea></div><div class="fa"><button class="bc" onclick="cm('m-add')">Cancel</button><button class="bs" onclick="submitF()">${i?"Update Issue":"Add Issue"}</button></div>`;
+}
+
+function gfd(){return{project:document.getElementById("fp").value,device:document.getElementById("fd").value,customDevice:document.getElementById("fcd")?.value||"",alarm:document.getElementById("fa").value,srNo:document.getElementById("fs").value,occurredDate:document.getElementById("fo").value,resolvedDate:document.getElementById("fr").value,task:document.getElementById("ftk").value,taskAssignee:document.getElementById("fta").value,taskStatus:document.getElementById("fts").value,manhours:document.getElementById("fm").value,siteMaintenanceStatus:document.getElementById("fsm").value,officeMaintenanceStatus:document.getElementById("fom").value,remark:document.getElementById("fre").value};}
+
+function openAdd(){editId=null;document.getElementById("mt").textContent="Report New Issue";document.getElementById("mfb").innerHTML=bf(null);om("m-add");}
+function openEdit(id){const i=issues.find(x=>x.id===id);if(!i)return;editId=id;document.getElementById("mt").textContent="Edit Issue";document.getElementById("mfb").innerHTML=bf(i);om("m-add");}
+
+function submitF(){
+  const d=gfd();if(!d.alarm||!d.occurredDate){alert("Please fill Alarm Type and Occurred Date.");return;}
+  if(editId!==null){
+    d.id=editId;issues=issues.map(i=>i.id===editId?d:i);
+  }else{
+    const mx=issues.reduce((m,i)=>Math.max(m,i.id||0),0);d.id=mx+1;issues.push(d);
+  }
+  cm("m-add");
+  saveData();
+}
+
+function cDel(id){document.getElementById("bcd").onclick=()=>{issues=issues.filter(i=>i.id!==id);cm("m-del");saveData();};om("m-del");}
+
+function clearAll(){if(!confirm("Clear ALL records? Cannot be undone."))return;issues=[];saveData();}
+
+function exportCSV(){
+  const f=gf(),hd=["No","Project","Device","Alarm Type","SR No","Occurred","Resolved","Duration","Status","Task","Assignee","Task Status","Manhours","Site Maint.","Central Maint.","Remark"];
+  const rows=f.map((i,x)=>[x+1,i.project,i.device==="Other"?(i.customDevice||"Other"):i.device,`"${(i.alarm||"").replace(/"/g,'""')}"`,i.srNo||"-",fmtD(i.occurredDate),fmtD(i.resolvedDate),dur(i.occurredDate,i.resolvedDate),i.resolvedDate?"Resolved":"On-going",`"${(i.task||"").replace(/"/g,'""')}"`,i.taskAssignee||"-",i.taskStatus||"-",i.manhours||"-",i.siteMaintenanceStatus||"-",i.officeMaintenanceStatus||"-",`"${(i.remark||"").replace(/"/g,'""')}"`]);
+  const csv=[hd.join(","),...rows.map(r=>r.join(","))].join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`BESS_Issues_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+function copyScript(){const el=document.getElementById("script-code");navigator.clipboard.writeText(el.textContent.replace("📋 Copy","")).then(()=>alert("Script copied!"));}
+
+function om(id){document.getElementById(id).classList.add("on");}
+function cm(id){document.getElementById(id).classList.remove("on");}
+document.querySelectorAll(".mo").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el)el.classList.remove("on");});});
+
+// ========== DASHBOARD ==========
+let dashOpen=false;
+let charts={};
+
+function toggleDash(){
+  dashOpen=!dashOpen;
+  document.getElementById("dashboard").style.display=dashOpen?"block":"none";
+  document.querySelector(".filters").style.display=dashOpen?"none":"flex";
+  document.querySelector(".table-wrap").style.display=dashOpen?"none":"block";
+  document.getElementById("dash-btn").innerHTML=dashOpen?"📋 Table View":"📊 Dashboard";
+  if(dashOpen) renderCharts();
+}
+
+function destroyCharts(){Object.values(charts).forEach(c=>{if(c)c.destroy();});charts={};}
+
+function renderCharts(){
+  destroyCharts();
+  if(!issues.length)return;
+  if(window.Chart){Chart.register(ChartDataLabels);Chart.defaults.font.family="'DM Sans',sans-serif";Chart.defaults.font.size=10;Chart.defaults.plugins.legend.labels.boxWidth=10;Chart.defaults.plugins.legend.labels.boxHeight=10;Chart.defaults.plugins.legend.labels.padding=8;Chart.defaults.maintainAspectRatio=false;Chart.defaults.color="#475569";}
+  const COLORS=["#1B2A4A","#3D6A9E","#C9A84C","#27ae60","#e74c3c","#8e44ad","#e67e22","#1abc9c","#2980b9","#f39c12"];
+  var isClose=function(i){return i.taskStatus==="Completed";};
+
+  // 1. Monthly — Open vs Close (by occurred month, split by current status)
+  const months={};
+  issues.forEach(i=>{
+    if(i.occurredDate){
+      const d=new Date(i.occurredDate),k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      if(!months[k])months[k]={open:0,close:0};
+      if(isClose(i))months[k].close++; else months[k].open++;
+    }
+  });
+  const mKeys=Object.keys(months).sort();
+  const mLabels=mKeys.map(k=>{const a=k.split("-");return["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+a[1]-1]+" "+a[0];});
+  charts.monthly=new Chart(document.getElementById("ch-monthly"),{
+    type:"bar",
+    data:{labels:mLabels,datasets:[
+      {label:"Open",data:mKeys.map(k=>months[k].open),backgroundColor:"#e74c3c",borderRadius:4},
+      {label:"Close",data:mKeys.map(k=>months[k].close),backgroundColor:"#27ae60",borderRadius:4}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:"top"},datalabels:{color:"#fff",font:{weight:"bold",size:10},formatter:function(v){return v>0?v:"";}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  // 2. By Project — Open vs Close
+  const projOpen={},projClose={},projSet={};
+  issues.forEach(i=>{const p=i.project||"(none)";projSet[p]=1;if(isClose(i))projClose[p]=(projClose[p]||0)+1;else projOpen[p]=(projOpen[p]||0)+1;});
+  const pKeys=Object.keys(projSet).sort();
+  charts.project=new Chart(document.getElementById("ch-project"),{
+    type:"bar",
+    data:{labels:pKeys,datasets:[
+      {label:"Open",data:pKeys.map(k=>projOpen[k]||0),backgroundColor:"#e74c3c",borderRadius:4},
+      {label:"Close",data:pKeys.map(k=>projClose[k]||0),backgroundColor:"#27ae60",borderRadius:4}
+    ]},
+    options:{responsive:true,indexAxis:"y",plugins:{legend:{position:"top"},datalabels:{color:"#fff",font:{weight:"bold",size:10},formatter:function(v){return v>0?v:"";}}},scales:{x:{stacked:true,beginAtZero:true,ticks:{stepSize:1}},y:{stacked:true}}}
+  });
+
+  // 3. Overall Status — Open vs Close (doughnut)
+  const openN=issues.filter(i=>!isClose(i)).length,closeN=issues.filter(i=>isClose(i)).length;
+  charts.status=new Chart(document.getElementById("ch-status"),{
+    type:"doughnut",
+    data:{labels:["Open","Close"],datasets:[{data:[openN,closeN],backgroundColor:["#e74c3c","#27ae60"],borderWidth:2,borderColor:"#fff"}]},
+    options:{responsive:true,cutout:"62%",plugins:{legend:{position:"bottom"},datalabels:{color:"#fff",font:{weight:"bold",size:13},formatter:function(v){return v>0?v:"";}}}}
+  });
+
+  // 4. By Device
+  const devMap={};
+  issues.forEach(i=>{const d=i.device==="Other"?(i.customDevice||"Other"):i.device;devMap[d]=(devMap[d]||0)+1;});
+  const dKeys=Object.keys(devMap).sort((a,b)=>devMap[b]-devMap[a]);
+  charts.device=new Chart(document.getElementById("ch-device"),{
+    type:"doughnut",
+    data:{labels:dKeys,datasets:[{data:dKeys.map(k=>devMap[k]),backgroundColor:dKeys.map(k=>DC[k]||"#7f8c8d"),borderWidth:2,borderColor:"#fff"}]},
+    options:{responsive:true,cutout:"62%",plugins:{legend:{position:"bottom"},datalabels:{color:"#fff",font:{weight:"bold",size:11},formatter:function(v){return v>0?v:"";}}}}
+  });
+
+  // 5. Site Maintenance Work (separate)
+  const siteCats=["Open","Assign","Close"];
+  const siteMap={Open:0,Assign:0,Close:0};
+  issues.forEach(i=>{var s=i.siteMaintenanceStatus;if(siteMap[s]!==undefined)siteMap[s]++;});
+  charts.site=new Chart(document.getElementById("ch-site"),{
+    type:"bar",
+    data:{labels:siteCats,datasets:[{label:"Site Maintenance",data:siteCats.map(c=>siteMap[c]),backgroundColor:["#f59e0b","#3b82f6","#10b981"],borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{color:"#fff",font:{weight:"bold",size:11},anchor:"center",formatter:function(v){return v>0?v:"";}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  // 6. Central Maintenance Work (separate)
+  const cenCats=["Open","In Progress","Close"];
+  const cenMap={Open:0,"In Progress":0,Close:0};
+  issues.forEach(i=>{var s=i.officeMaintenanceStatus;if(cenMap[s]!==undefined)cenMap[s]++;});
+  charts.central=new Chart(document.getElementById("ch-central"),{
+    type:"bar",
+    data:{labels:cenCats,datasets:[{label:"Central Maintenance",data:cenCats.map(c=>cenMap[c]),backgroundColor:["#f59e0b","#6366f1","#10b981"],borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{color:"#fff",font:{weight:"bold",size:11},anchor:"center",formatter:function(v){return v>0?v:"";}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+}
+</script>
+</body>
+</html>
