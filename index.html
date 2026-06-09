@@ -587,7 +587,7 @@ function gfd(){return{project:document.getElementById("fp").value,device:documen
 // Passcode check for edit/delete operations
 var passVerified=false, passTimer=null;
 function checkPass(msg,cb){
-  if(passVerified){cb();return;}
+  
   var code=prompt(msg+"\n\nEnter passcode to proceed:");
   if(code===EDIT_PASSCODE){
     passVerified=true;
