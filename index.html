@@ -166,42 +166,6 @@ function doGet(e) {
     for (let i=1;i&lt;data.length;i++) { const r=data[i]; if(!r[0]&&!r[4])continue; const o={}; h.forEach((k,j)=>{o[k]=r[j]||""}); o.id=Number(o.id)||i; issues.push(o); }
     return cr({success:true,issues});
   } catch(err) { return cr({success:false,error:err.message}); }
-
-  // 7. Weekly Issues — Open vs Close
-  var nowMs=new Date().getTime();
-  var DAY7=7*24*60*60*1000;
-  var wk=[0,0,0,0],wkO=[0,0,0,0],wkC=[0,0,0,0];
-  var matched=0,unmatched=0;
-  issues.forEach(function(iss){
-    if(!iss.occurredDate)return;
-    var dt=new Date(iss.occurredDate);
-    var t=dt.getTime();
-    if(!t||isNaN(t))return;
-    var daysAgo=Math.floor((nowMs-t)/(24*60*60*1000));
-    var weekIdx=Math.floor(daysAgo/7);
-    if(weekIdx>=0&&weekIdx<4){
-      matched++;
-      wk[3-weekIdx]++;
-      if(iss.taskStatus==="Completed")wkC[3-weekIdx]++;else wkO[3-weekIdx]++;
-    }else{unmatched++;}
-  });
-  console.log("Weekly chart: matched="+matched+" unmatched="+unmatched+" wkO="+wkO+" wkC="+wkC);
-  var nowD=new Date();
-  var wkL2=[];
-  for(var li=3;li>=0;li--){
-    var eD=new Date(nowMs-(li*DAY7));
-    var sD=new Date(nowMs-((li+1)*DAY7-24*60*60*1000));
-    var ff=function(d){return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");};
-    wkL2.push("W"+(4-li)+" ("+ff(sD)+"-"+ff(eD)+")");
-  }
-  charts.weekly=new Chart(document.getElementById("ch-weekly"),{
-    type:"bar",
-    data:{labels:wkL2,datasets:[
-      {label:"Open",data:wkO,backgroundColor:"#e74c3c",borderRadius:4},
-      {label:"Close",data:wkC,backgroundColor:"#27ae60",borderRadius:4}
-    ]},
-    options:{responsive:true,plugins:{legend:{position:"top"},title:{display:true,text:"Total in range: "+matched+" | Outside: "+unmatched,font:{size:9},color:"#94a3b8"},datalabels:{color:"#fff",font:{weight:"bold",size:11},formatter:function(v){return v>0?v:"";}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
-  });
 }
 
 function doPost(e) {
@@ -832,6 +796,24 @@ function renderCharts(){
     data:{labels:cenCats,datasets:[{label:"Central Maintenance",data:cenCats.map(c=>cenMap[c]),backgroundColor:["#f59e0b","#6366f1","#10b981"],borderRadius:4}]},
     options:{responsive:true,plugins:{legend:{display:false},datalabels:{color:"#fff",font:{weight:"bold",size:11},anchor:"center",formatter:function(v){return v>0?v:"";}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
   });
+
+  // 7. Weekly Issues — Open vs Close
+  var weekMap={};
+  issues.forEach(function(i){
+    if(i.occurredDate){
+      var d2=new Date(i.occurredDate);
+      var day2=d2.getDay(),diff2=day2===0?6:day2-1;
+      var mon2=new Date(d2);mon2.setDate(d2.getDate()-diff2);
+      var k2=String(mon2.getDate()).padStart(2,"0")+"/"+String(mon2.getMonth()+1).padStart(2,"0")+"/"+mon2.getFullYear();
+      if(!weekMap[k2])weekMap[k2]={o:0,c:0};
+      if(i.taskStatus==="Completed")weekMap[k2].c++;else weekMap[k2].o++;
+    }
+  });
+  var wK2=Object.keys(weekMap).sort(function(a,b){var pa=a.split("/");var pb=b.split("/");return new Date(pa[2],pa[1]-1,pa[0])-new Date(pb[2],pb[1]-1,pb[0]);}).slice(-4);
+  if(wK2.length>0){
+    var wEnd=wK2.map(function(k){var p=k.split("/");var ms=new Date(+p[2],+p[1]-1,+p[0]);var me=new Date(ms);me.setDate(ms.getDate()+6);return String(ms.getDate()).padStart(2,"0")+"/"+String(ms.getMonth()+1).padStart(2,"0")+" - "+String(me.getDate()).padStart(2,"0")+"/"+String(me.getMonth()+1).padStart(2,"0");});
+    charts.weekly=new Chart(document.getElementById("ch-weekly"),{type:"bar",data:{labels:wEnd,datasets:[{label:"Open",data:wK2.map(function(k){return weekMap[k].o;}),backgroundColor:"#e74c3c",borderRadius:4},{label:"Close",data:wK2.map(function(k){return weekMap[k].c;}),backgroundColor:"#27ae60",borderRadius:4}]},options:{responsive:true,plugins:{legend:{position:"top"},datalabels:{color:"#fff",font:{weight:"bold",size:11},formatter:function(v){return v>0?v:"";}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}});
+  }
 }
 </script>
 </body>
