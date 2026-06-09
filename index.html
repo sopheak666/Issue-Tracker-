@@ -220,7 +220,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
           <h1>BESS On-Going Issues Tracker</h1>
           <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
             <span style="font-size:12px;opacity:.7">SchneiTec ESS Operations Office</span>
-            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v26</span>
+            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v27</span>
             <span id="sync-ind" style="font-size:11px;display:flex;align-items:center;gap:5px">
               <span class="sync-dot live" id="sd"></span><span id="st">Connecting...</span>
             </span>
@@ -278,7 +278,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
   </div>
 
   <div class="table-wrap"><div id="tc"></div></div>
-  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v26</b></div>
+  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v27</b></div>
 </div>
 
 <!-- MODALS -->
@@ -420,9 +420,28 @@ function doFetchAttempt(){
 }
 function retryOrFail(){
   fetchRetries++;
-  if(fetchRetries<=5){
+  if(fetchRetries<=3){
     upSync("syncing");
     setTimeout(doFetchAttempt, 2000);
+  } else if(fetchRetries<=5){
+    // Try fetch with redirect:follow as fallback (works in some browsers)
+    upSync("syncing");
+    setTimeout(function(){
+      fetch(API,{redirect:"follow"}).then(function(r){return r.json();}).then(function(d){
+        fetchRetries=0; hideLoad();
+        if(d && d.success && d.issues){
+          if(!pendingSync){
+            var valid=d.issues.length===0||(d.issues[0].project!==undefined);
+            if(valid && d.issues.length>0){issues=d.issues;saveLocal();}
+            else if(d.issues.length===0 && issues.length>0){syncToSheet();}
+          }
+        }
+        render(); upSync("live");
+      }).catch(function(){
+        fetchRetries++;
+        retryOrFail();
+      });
+    },2000);
   } else {
     fetchRetries=0;
     hideLoad();
@@ -453,13 +472,30 @@ function syncToSheet(){
   syncLockTimer=setTimeout(function(){pendingSync=false;},12000);
   upSync("syncing");
   var payload=JSON.stringify({action:"save_all",issues:issues});
+  var sent=false;
 
-  // Method 1: fetch with no-cors (works in Edge, bypasses tracking prevention)
+  // Method 1: sendBeacon with URLSearchParams (most reliable cross-browser)
   try{
-    fetch(API,{method:"POST",body:payload,mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"}}).catch(function(){});
+    if(navigator.sendBeacon){
+      var params=new URLSearchParams();
+      params.append("data",payload);
+      sent=navigator.sendBeacon(API,params);
+    }
+  }catch(e){console.log("sendBeacon failed:",e);}
+
+  // Method 2: fetch with no-cors + text/plain body
+  try{
+    fetch(API,{method:"POST",body:payload,mode:"no-cors",keepalive:true,headers:{"Content-Type":"text/plain;charset=utf-8"}}).catch(function(){});
   }catch(e){}
 
-  // Method 2: Hidden form submit as backup
+  // Method 3: fetch with no-cors + form-encoded body
+  try{
+    var fd=new URLSearchParams();
+    fd.append("data",payload);
+    fetch(API,{method:"POST",body:fd,mode:"no-cors",keepalive:true}).catch(function(){});
+  }catch(e){}
+
+  // Method 4: Hidden form submit as last resort
   try{
     var form=document.getElementById("sync-form");
     form.action=API;
@@ -467,14 +503,8 @@ function syncToSheet(){
     form.submit();
   }catch(e){}
 
-  // Method 3: Image beacon as last resort
-  try{
-    var img=new Image();
-    img.src=API+"?beacon=1&t="+Date.now();
-  }catch(e){}
-
   setTimeout(function(){upSync("live");},2000);
-  // After sync completes, do a fresh fetch to confirm
+  // After sync, verify by fetching fresh data
   setTimeout(function(){pendingSync=false; if(useAPI)fetchAll();},10000);
 }
 
