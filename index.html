@@ -166,6 +166,42 @@ function doGet(e) {
     for (let i=1;i&lt;data.length;i++) { const r=data[i]; if(!r[0]&&!r[4])continue; const o={}; h.forEach((k,j)=>{o[k]=r[j]||""}); o.id=Number(o.id)||i; issues.push(o); }
     return cr({success:true,issues});
   } catch(err) { return cr({success:false,error:err.message}); }
+
+  // 7. Weekly Issues — Open vs Close
+  var nowMs=new Date().getTime();
+  var DAY7=7*24*60*60*1000;
+  var wk=[0,0,0,0],wkO=[0,0,0,0],wkC=[0,0,0,0];
+  var matched=0,unmatched=0;
+  issues.forEach(function(iss){
+    if(!iss.occurredDate)return;
+    var dt=new Date(iss.occurredDate);
+    var t=dt.getTime();
+    if(!t||isNaN(t))return;
+    var daysAgo=Math.floor((nowMs-t)/(24*60*60*1000));
+    var weekIdx=Math.floor(daysAgo/7);
+    if(weekIdx>=0&&weekIdx<4){
+      matched++;
+      wk[3-weekIdx]++;
+      if(iss.taskStatus==="Completed")wkC[3-weekIdx]++;else wkO[3-weekIdx]++;
+    }else{unmatched++;}
+  });
+  console.log("Weekly chart: matched="+matched+" unmatched="+unmatched+" wkO="+wkO+" wkC="+wkC);
+  var nowD=new Date();
+  var wkL2=[];
+  for(var li=3;li>=0;li--){
+    var eD=new Date(nowMs-(li*DAY7));
+    var sD=new Date(nowMs-((li+1)*DAY7-24*60*60*1000));
+    var ff=function(d){return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");};
+    wkL2.push("W"+(4-li)+" ("+ff(sD)+"-"+ff(eD)+")");
+  }
+  charts.weekly=new Chart(document.getElementById("ch-weekly"),{
+    type:"bar",
+    data:{labels:wkL2,datasets:[
+      {label:"Open",data:wkO,backgroundColor:"#e74c3c",borderRadius:4},
+      {label:"Close",data:wkC,backgroundColor:"#27ae60",borderRadius:4}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:"top"},title:{display:true,text:"Total in range: "+matched+" | Outside: "+unmatched,font:{size:9},color:"#94a3b8"},datalabels:{color:"#fff",font:{weight:"bold",size:11},formatter:function(v){return v>0?v:"";}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+  });
 }
 
 function doPost(e) {
@@ -258,11 +294,13 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
       <div class="chart-card"><h3 class="chart-title">Monthly Issues — Open vs Close</h3><canvas id="ch-monthly"></canvas></div>
+      <div class="chart-card"><h3 class="chart-title">Weekly Issues — Open vs Close</h3><canvas id="ch-weekly"></canvas></div>
       <div class="chart-card"><h3 class="chart-title">Issues by Project (Open vs Close)</h3><canvas id="ch-project"></canvas></div>
       <div class="chart-card"><h3 class="chart-title">Overall Status (Open vs Close)</h3><canvas id="ch-status"></canvas></div>
       <div class="chart-card"><h3 class="chart-title">Issues by Device</h3><canvas id="ch-device"></canvas></div>
       <div class="chart-card"><h3 class="chart-title">🛠 Site Maintenance Work</h3><canvas id="ch-site"></canvas></div>
       <div class="chart-card"><h3 class="chart-title">🏢 Central Maintenance Work</h3><canvas id="ch-central"></canvas></div>
+
     </div>
   </div>
 
@@ -313,7 +351,7 @@ const SG=[{h:"On Going",i:["Open","Assign"]},{h:"Resolved",i:["Close"]},{h:"Othe
 const OG=[{h:"On Going",i:["Open","In Progress"]},{h:"Resolved",i:["Close"]},{h:"Other",i:["N/A"]}];
 const MC={Open:{b:"#fef3c7",t:"#92400e",d:"#f59e0b"},Assign:{b:"#dbeafe",t:"#1e40af",d:"#3b82f6"},"In Progress":{b:"#e0e7ff",t:"#3730a3",d:"#6366f1"},Close:{b:"#d1fae5",t:"#065f46",d:"#10b981"},"N/A":{b:"#f1f5f9",t:"#64748b",d:"#94a3b8"}};
 
-let issues=[],API="",useAPI=false,cFilter="All",sCol="occurredDate",sAsc=false,editId=null,pollTimer=null;
+let issues=[],API="",useAPI=false,cFilter="All",sCol="occurredDate",sAsc=true,editId=null,pollTimer=null;
 
 // ---- Connect ----
 function connectGoogleSheet(){
