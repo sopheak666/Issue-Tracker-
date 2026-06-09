@@ -220,7 +220,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
           <h1>BESS On-Going Issues Tracker</h1>
           <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
             <span style="font-size:12px;opacity:.7">SchneiTec ESS Operations Office</span>
-            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v27</span>
+            <span style="font-size:10px;background:#27ae60;color:#fff;padding:1px 7px;border-radius:4px;font-weight:700">v28</span>
             <span id="sync-ind" style="font-size:11px;display:flex;align-items:center;gap:5px">
               <span class="sync-dot live" id="sd"></span><span id="st">Connecting...</span>
             </span>
@@ -278,7 +278,7 @@ function cr(o){return ContentService.createTextOutput(JSON.stringify(o)).setMime
   </div>
 
   <div class="table-wrap"><div id="tc"></div></div>
-  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v27</b></div>
+  <div class="footer">SchneiTec ESS Division — <span id="ml">Google Drive Storage</span> — <b style="color:#27ae60">App v28</b></div>
 </div>
 
 <!-- MODALS -->
@@ -464,48 +464,75 @@ function forcePush(){
 // Sync lock: prevents fetchAll from overwriting local changes while syncing
 var pendingSync=false, syncLockTimer=null;
 
+// JSONP-based sync — works in ALL browsers, no CORS issues
+function jsonpWrite(action, data, onDone){
+  var cbName="__bw_"+Date.now();
+  window[cbName]=function(d){
+    delete window[cbName];
+    if(onDone)onDone(d);
+  };
+  var url=API+"?callback="+cbName+"&action="+action+"&t="+Date.now();
+  if(data)url+="&data="+encodeURIComponent(data);
+  var s=document.createElement("script");
+  s.src=url;
+  s.onerror=function(){delete window[cbName]; s.remove();};
+  s.onload=function(){setTimeout(function(){s.remove();},200);};
+  document.head.appendChild(s);
+}
+
 function syncToSheet(){
   if(!useAPI||!API)return;
-  // Lock for 12 seconds so fetchAll doesn't overwrite during sync
   pendingSync=true;
   if(syncLockTimer)clearTimeout(syncLockTimer);
   syncLockTimer=setTimeout(function(){pendingSync=false;},12000);
   upSync("syncing");
-  var payload=JSON.stringify({action:"save_all",issues:issues});
-  var sent=false;
 
-  // Method 1: sendBeacon with URLSearchParams (most reliable cross-browser)
-  try{
-    if(navigator.sendBeacon){
-      var params=new URLSearchParams();
-      params.append("data",payload);
-      sent=navigator.sendBeacon(API,params);
-    }
-  }catch(e){console.log("sendBeacon failed:",e);}
+  var payload=JSON.stringify(issues);
 
-  // Method 2: fetch with no-cors + text/plain body
-  try{
-    fetch(API,{method:"POST",body:payload,mode:"no-cors",keepalive:true,headers:{"Content-Type":"text/plain;charset=utf-8"}}).catch(function(){});
-  }catch(e){}
+  // Check URL length — JSONP GET has URL limit (~8000 chars)
+  var testUrl=API+"?action=save_all&data="+encodeURIComponent(payload);
+  if(testUrl.length<7500){
+    // Method 1: JSONP write (works in ALL browsers)
+    jsonpWrite("save_all",payload,function(d){
+      upSync("live");
+      setTimeout(function(){pendingSync=false;},2000);
+    });
+  } else {
+    // Payload too large for URL — use POST methods as fallback
+    var postPayload=JSON.stringify({action:"save_all",issues:issues});
+    try{
+      if(navigator.sendBeacon){
+        var params=new URLSearchParams();
+        params.append("data",postPayload);
+        navigator.sendBeacon(API,params);
+      }
+    }catch(e){}
+    try{
+      fetch(API,{method:"POST",body:postPayload,mode:"no-cors",keepalive:true,headers:{"Content-Type":"text/plain;charset=utf-8"}}).catch(function(){});
+    }catch(e){}
+    setTimeout(function(){upSync("live");},2000);
+    setTimeout(function(){pendingSync=false;},5000);
+  }
+}
 
-  // Method 3: fetch with no-cors + form-encoded body
-  try{
-    var fd=new URLSearchParams();
-    fd.append("data",payload);
-    fetch(API,{method:"POST",body:fd,mode:"no-cors",keepalive:true}).catch(function(){});
-  }catch(e){}
-
-  // Method 4: Hidden form submit as last resort
-  try{
-    var form=document.getElementById("sync-form");
-    form.action=API;
-    document.getElementById("sync-data").value=payload;
-    form.submit();
-  }catch(e){}
-
-  setTimeout(function(){upSync("live");},2000);
-  // After sync, verify by fetching fresh data
-  setTimeout(function(){pendingSync=false; if(useAPI)fetchAll();},10000);
+// Sync individual operations (add/update/delete) — always JSONP
+function syncAdd(issue){
+  if(!useAPI||!API)return;
+  jsonpWrite("add",JSON.stringify(issue),function(){upSync("live");});
+}
+function syncUpdate(issue){
+  if(!useAPI||!API)return;
+  jsonpWrite("update",JSON.stringify(issue),function(){upSync("live");});
+}
+function syncDel(id){
+  if(!useAPI||!API)return;
+  var cbName="__bd_"+Date.now();
+  window[cbName]=function(){delete window[cbName];upSync("live");};
+  var s=document.createElement("script");
+  s.src=API+"?callback="+cbName+"&action=delete&id="+id+"&t="+Date.now();
+  s.onerror=function(){delete window[cbName];s.remove();};
+  s.onload=function(){setTimeout(function(){s.remove();},200);};
+  document.head.appendChild(s);
 }
 
 // Save data: always local first, then sync to sheet
@@ -630,16 +657,18 @@ function submitF(){
   const d=gfd();if(!d.alarm||!d.occurredDate){alert("Please fill Alarm Type and Occurred Date.");return;}
   if(editId!==null){
     d.id=editId;issues=issues.map(i=>i.id===editId?d:i);
+    cm("m-add"); saveLocal(); render();
+    if(useAPI) syncUpdate(d);
   }else{
     const mx=issues.reduce((m,i)=>Math.max(m,i.id||0),0);d.id=mx+1;issues.push(d);
+    cm("m-add"); saveLocal(); render();
+    if(useAPI) syncAdd(d);
   }
-  cm("m-add");
-  saveData();
 }
 
-function cDel(id){document.getElementById("bcd").onclick=()=>{issues=issues.filter(i=>i.id!==id);cm("m-del");saveData();};om("m-del");}
+function cDel(id){document.getElementById("bcd").onclick=()=>{issues=issues.filter(i=>i.id!==id);cm("m-del");saveLocal();render();if(useAPI)syncDel(id);};om("m-del");}
 
-function clearAll(){if(!confirm("Clear ALL records? Cannot be undone."))return;issues=[];saveData();}
+function clearAll(){if(!confirm("Clear ALL records? Cannot be undone."))return;issues=[];saveLocal();render();if(useAPI){jsonpWrite("clear_all","",function(){upSync("live");});}}
 
 function exportCSV(){
   var f=gf();
